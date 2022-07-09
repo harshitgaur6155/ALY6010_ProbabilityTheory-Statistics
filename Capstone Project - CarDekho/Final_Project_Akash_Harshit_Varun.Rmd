@@ -1,0 +1,1151 @@
+---
+title: "Final Project"
+author:
+- 'Members : Harshit Gaur, Akash Raj, Varun Singh'
+- 'Professor : Dr. Amin Karimpour'
+date: 'Date : 12/11/2021'
+output:
+  html_document:
+    theme: cerulean
+    highlight: kate
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+always_allow_html: yes
+subtitle: ALY 6010 - 70864
+---
+
+# Introduction
+
+Data analytics is the process of analyzing raw data and generating actionable insights. It comprises of the processes, tools and techniques of data analysis and management, including the collection, organization, and storage of data. Organizations use data analytics to gain competitive advantage by improving their performance and operational efficiency. Data analytics is performed on a variety of big data sets, like transactions, click streams, server logs, electronic health records, insurance claims, etc. Different analytical techniques and algorithms can be applied on these data sets to accomplish different objectives. These different types of analytical techniques are colloquially called:-  
+  
+1. __Descriptive analytics__ - Summarizing the data to understand past events and performance  
+2. __Diagnostic analytics__ - Investigating the root cause of certain events  
+3. __Predictive analytics__ - Predicting the future for planning  
+4. __Prescriptive analytics__ - Recommending the optimal outcomes  
+
+Irrespective of the type of analytics being performed, the basis of every method or algorithm in data analytics is descriptive/inferential statistics and machine learning. In this analysis report, we will leverage descriptive statistics to generate insights from the data.
+
+__Problems Statement :__  
+
+<a href="https://www.cardekho.com/">CarDekho.com</a> is India's leading car search venture that helps users buy cars that are right for them. It's website and app carry rich automotive content such as expert reviews, detailed specs and prices, comparisons as well as videos and pictures of all car brands and models available in India.
+
+We have the sales data of all the cars sold during the time frame of 1983 to 2020. We are going to analyse this data set in order to help them expand their business, gain and retain customers, and stand out the competitions they face. 
+
+The data set has 8128 data points with 13 features in it related to :
+
+<ul>
+<li> **Car Details -** _Car name, transmission, fuel type, number of seats, year of manufacturing._ 
+<li> **Engine Details -** _Mileage, Engine type, Torque, Maximum power in BHP._
+<li> **Sale Details -** _Selling price, kilometers driven by the car._
+</ul>
+
+Later, we will implement learning algorithms and modelling techniques to understand the patterns and achieve high quality, consistent results targeting the following points :
+
+<ul>
+<li>Identify the right prospects at the right time
+<li>Build customer loyalty.
+<li>Promote efficiency across the departments.
+<li>Marketing expenditures and supply chain management.
+</ul>
+
+# Data Analysis
+  
+__Importing the libraries required for the analysis__
+
+```{r library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(DT)
+library(RColorBrewer)
+library(data.table)
+library(knitr)
+library(caret)
+library(stringr)
+library(RANN)
+library(data.table)
+library(vtable)
+library(scales)
+library(gplots)
+library(MASS)
+library(ggpubr)
+```
+
+```{r path, echo=FALSE}
+setwd("/Users/HarshitGaur/Documents/Northeastern University/MPS Analytics/ALY 6010/Final Project/ALY6010_Final_Project/Milestone 3 - Final/")
+```
+
+__Importing the data set for analysis__
+
+```{r import, message=FALSE, warning=FALSE}
+car_sales <- read.csv("CarDekho Sales.csv")
+```
+
+__Head of data__
+
+```{r head, message=FALSE, warning=FALSE}
+# View the head and summary of the data
+DT::datatable(head(car_sales, 5), rownames = FALSE)
+```
+
+__Dimension and summary of data__
+
+```{r summ, message=FALSE, warning=FALSE}
+# View the dimension and summary of the data
+dim(car_sales)
+summary(car_sales)
+```
+   
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>There are 8128 observations with 13 features in the data set.
+
+## Data Cleaning
+
+__Extract value from the 'Mileage' column__
+
+The feature 'mileage' contains nominal categorical values suffixed with unit measurements of fuel efficiency. We need to clean this feature by removing the measurements (like kmpl, km/kg, etc.) and convert the data type of this feature from categorical to numeric for further utilization in analysis. We are using 'gsub' function of the 'base' package to perform this operation.
+```{r mileage, message=FALSE, warning=FALSE}
+# Replace the 'kmpl, km/kg' string from data points in the 'mileage' feature. Convert to numeric data type.
+car_sales$mileage <- as.numeric(gsub('[a-zA-Z/ ]', '', car_sales$mileage))
+```
+  
+  
+__Extract value from the 'Engine' column__
+
+The feature 'engine' contains nominal categorical values suffixed with unit measurements of capacity. We need to clean this feature by removing the measurements (like CC) and convert the data type of this feature from categorical to numeric for further utilization in analysis. We are using 'gsub' function of the 'base' package to perform this operation.
+```{r engine, message=FALSE, warning=FALSE}
+# Replace the 'CC' string from data points in the 'engine' feature. Convert to numeric data type.
+car_sales$engine <- as.numeric(gsub('[a-zA-Z/ ]', '', car_sales$engine))
+```
+  
+  
+__Extract value from the 'Max Power' column__
+
+The feature 'max_power' contains nominal categorical values suffixed with unit measurements of Brake Horse Power (BHP). We need to clean this feature by removing these measurements (like bhp) and convert the data type of this feature from categorical to numeric for further utilization in analysis. We used the 'str_remove' function from the 'stringr' package to perform this operation.
+```{r max_power, message=FALSE, warning=FALSE}
+car_sales$max_power <- as.numeric(str_remove(car_sales$max_power, " [a-z]+"))
+```
+  
+  
+__Extract torque value from the 'Torque' column__
+
+The feature 'torque' contains nominal categorical values suffixed with imperial measurements of Newton meters along with 'Revolutions per minute'. We need to extract the torque values from this feature into another feature which will be further utilized in analysis and have the data type of this new feature as numeric.
+There were 2 values in the 'torque' feature from which we needed to extract the 1st part of the numeric value as 'Torque' and the latter part as 'RPM'. The functions 'str_sub' and 'str_locate' form the package 'stringr' were used to perform this operation.
+```{r torque, message=FALSE, warning=FALSE}
+car_sales$torque_val <- as.numeric(str_sub(car_sales$torque, rep(1, nrow(car_sales)), 
+                                           str_locate(car_sales$torque, "\\D+")[,1]-1))
+```
+  
+  
+__Extract RPM value from the torque column__
+
+The feature 'torque' contains nominal categorical values suffixed with imperial measurements of Newton meters along with 'Revolutions per minute'. We need to extract the RPM values from this 'torque' feature into another feature which will be further utilized in analysis and have the data type of this new feature as numeric. 
+We extracted the first part of torque as 'Torque Value' and needed to extract the second part as 'RPM' value. The functions of 'str_sub' and 'gsub' were used to perform these operations.
+```{r torque_rpm, message=FALSE, warning=FALSE}
+num_length <- str_length(gsub("\\D+", "", car_sales$torque))
+car_sales$rpm <- as.numeric(str_sub(as.numeric(gsub("\\D+", "", car_sales$torque)),num_length-3, num_length))
+```
+  
+  
+__Extract brand from the car name column__
+
+The feature 'name' contains the name of the car, its manufacturer, and the model. We will extract the Brand name from this feature into another feature which will be further utilized in analysis. 
+Now, there are several data points where the brand names contain single word and multiple words. We formulated the extraction to take out the words corresponding to the brand names these cars belong to.
+```{r brand, message=FALSE, warning=FALSE}
+# Extract the brand name (first word) into another feature from the 'name' feature.
+car_sales$brand <- word(car_sales$name, start = 1, end = 1)
+
+# Extract the brand name (first 2 words) into another feature from the 'name' feature.
+car_sales$brand[car_sales$brand == "Ashok"] <- word(car_sales$name[car_sales$brand == "Ashok"], start = 1, end = 2)
+car_sales$brand[car_sales$brand == "Land"] <- word(car_sales$name[car_sales$brand == "Land"], start = 1, end = 2)
+car_sales$brand[car_sales$brand == "Range"] <- word(car_sales$name[car_sales$brand == "Range"], start = 1, end = 2)
+```
+  
+  
+__Filter out the values for CNG and LPG__
+
+The feature 'fuel' contains 4 different types namely Diesel, Petrol, CNG, LPG. We will eliminate those records which belong to CNG and LPG as their cumulative data points account for only 1.5% of the total records in the data set.
+```{r filter_out, message=FALSE, warning=FALSE}
+car_sales <- filter(car_sales, !fuel %in% c("LPG", "CNG"))
+```
+  
+  
+__Identify blank and NA values in the data__
+
+We further checked the data set for NA and blank values in all of its features.
+```{r missing1, message=FALSE, warning=FALSE}
+colSums(is.na(car_sales))
+```
+  
+  
+__Remove unnecessary columns in the dataframe__
+
+We removed some of the unnecessary columns from the data set as either informative values were extracted from them or were of no use.
+```{r columns_remove, message=FALSE, warning=FALSE}
+car_sales$name <- NULL
+car_sales$torque <- NULL
+names(car_sales)[12] <- "torque"
+```
+   
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>We found 214 records with NA values in most of the numeric features. These features need to be either removed or imputed by mean, median, etc.
+  
+  
+__Impute missing and NA values in the data using kNN__
+
+The data set contained few data points which contained missing or NA values in some of their features. We implemented the kNN algorithm to impute these missing and NA values with means of the features. This way we wouldn't need to eliminate these records and can utilize them as well for our analysis. The functions 'preProcess' and 'predict' from the 'caret' package were used to perform these operations.
+```{r missing3, message=FALSE, warning=FALSE}
+preProcValues <- preProcess(car_sales %>% 
+                              dplyr::select(year, selling_price, km_driven, fuel, seller_type, 
+                                            transmission, owner, mileage, engine, max_power, seats, torque, rpm),
+                            method = c("knnImpute"),
+                            k = 20,
+                            knnSummary = mean)
+
+impute_cars_info <- predict(preProcValues, car_sales, na.action = na.pass)
+
+procNames <- data.frame(col = names(preProcValues$mean), mean = preProcValues$mean, sd = preProcValues$std)
+
+for(i in procNames$col){
+  car_sales[i] <- impute_cars_info[i]*preProcValues$std[i]+preProcValues$mean[i] 
+}
+
+colSums(is.na(car_sales))
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>No NA or missing values were found after the kNN imputation.
+  
+  
+## Feature Engineering
+
+__Create categorical column to indicate the size of the car__
+
+A new feature named 'Car Type' is created to indicate the size of the car. We formulated the feature 'size' to calculate the size of car based on the following rule set :
+
+<ul>
+<li>If number of seats are less than or equal to 5, the type of car is "Small".
+<li>If number of seats are greater than 5 and less than equal to 8, the type of car is "Medium".
+<li>If number of seats are greater than 8 and less than equal to 14, the type of car is "Large".
+<li>If number of seats don't lie in the above range, we give the type as "Others" to the cars.
+</ul>
+```{r size, message=FALSE, warning=FALSE}
+car_sales$car_type <- ifelse(car_sales$seats <= 5, "Small", ifelse(car_sales$seats <= 8, "Medium", ifelse(car_sales$seats <= 14, "Large", "Others")))
+unique(car_sales$car_type)
+```
+  
+  
+__Create a numeric column to obtain the age of the car__
+
+We created another feature named 'age' which signifies the age of the car. The feature 'year' was utilised to calculate the age of all the cars.
+```{r age, message=FALSE, warning=FALSE}
+car_sales$age <- as.numeric(format(Sys.Date(), "%Y")) - car_sales$year
+ggplot(car_sales) +
+  geom_boxplot(mapping = aes(age))
+  
+```
+  
+  
+__Unit Modification (Changing 1000s to 1s) of two features__
+
+The values in the features 'Selling Price' and 'KMs driven' are in hundreds of thousands. We reduced these values from 1000s to Ones in order for proper analysis and better scaling of visualisations.
+```{r unitModify, message=FALSE, warning=FALSE}
+car_sales$selling_price <- round( (car_sales$selling_price / 1000), 2)
+car_sales$km_driven <- round( (car_sales$km_driven / 1000), 2)
+
+#car_sales[sapply(car_sales, as.character)] <- lapply(car_sales[sapply(car_sales, as.character)], as.factor)
+```
+  
+  
+__Changing Character data type to Factor data type__
+
+The features belonging to character data types need to be changed into factor data type for efficient text manipulations.
+```{r factor, message=FALSE, warning=FALSE}
+car_sales$fuel <- as.factor(car_sales$fuel)
+car_sales$seller_type <- as.factor(car_sales$seller_type)
+car_sales$transmission <- as.factor(car_sales$transmission)
+car_sales$owner <- as.factor(car_sales$owner)
+car_sales$brand <- as.factor(car_sales$brand)
+car_sales$car_type <- as.factor(car_sales$car_type)
+
+#car_sales[sapply(car_sales, as.character)] <- lapply(car_sales[sapply(car_sales, as.character)], as.factor)
+```
+  
+  
+## Exploratory Data Analysis
+
+__Descriptive Statistics of the data set__
+
+```{r desc_stats, message=FALSE, warning=FALSE}
+# Descriptive Statistics of the data set.
+mul_fun <- function(x) {
+  c(mean(x), sd(x), median(x), min(x), max(x), max(x)-min(x), quantile(x, 0.25), 
+    quantile(x, 0.5), quantile(x, 0.75))
+}
+
+var_names <- c("Mean", "Std Dev", "Median", "Min", "Max", "Range", "Percentile 25", "Percentile 50", 
+               "Percentile 75")
+num_cols <- c("selling_price", "km_driven", "mileage", "engine", "max_power", "torque", "rpm", "age")
+desc_stats <- as.data.frame(round(sapply(car_sales[num_cols], mul_fun), 2), row.names = var_names)
+DT::datatable(desc_stats)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>From the statistics table, we found the below points :
+
+<ol>
+<li>The minimum value of mileage is **0**. On further analysis, we found that some of the cars contain *0.0 Kmpl* values as their mileage. We would need to impute these values in our second phase of analysis.
+<li>The minimum value of max power also came out to be **0**. We found that some of the cars contain *0 bhp* values as their max power. On further analysis, we would need to impute these values as well.
+<li>Since, the cars are manufactured in the time frame of 1983 to 2020, the attributes (mileage, max power, engine, torque, and rpm) are very dispersed.
+<li>Mileage has the least skewed distribution as its mean and median are almost same for it.
+</ol>
+  
+  
+__Identify the Outliers in numeric variables__
+
+```{r outliers, message=FALSE, warning=FALSE}
+num_cols <- c("selling_price", "km_driven", "mileage", "engine", "max_power", "torque", "rpm", "age")
+outlier_val <- sapply(car_sales[num_cols], function(x) boxplot.stats(x)$out)
+min_outlier <- data.frame('Count of Outliers' = sapply(outlier_val, length), check.names = FALSE)
+DT::datatable(min_outlier)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>The count of outliers corresponding to their features have been tabulated in the above table. The count of outliers in the feature 'Selling Type' is 600 and 'engine' has outliers in north of 1000.
+We found that 'RPM' has no outliers in the data set.
+
+These outliers will need to be dealt with before building the regression models.
+  
+  
+### Univariate Analysis
+
+__Frequency plot of the categorical variables__
+
+We have various categorical features which can provide insightful information about the data set. The features for which we have formulated the frequency tables are :
+
+<ol>
+<li>Fuel Type
+<li>Seller Type
+<li>Transmission Type
+<li>Owner Type
+<li>Car Type
+</ol>
+
+```{r freq_plot, message=FALSE, warning=FALSE}
+# Frequency Table of Brands
+freqTable_fuel <- dplyr::count(car_sales, car_sales$fuel)
+colnames(freqTable_fuel) <- c("Fuel Type", "Frequency")
+
+freqTable_sellerType <- dplyr::count(car_sales, car_sales$seller_type)
+colnames(freqTable_sellerType) <- c("Seller Type", "Frequency")
+
+freqTable_transmission <- dplyr::count(car_sales, car_sales$transmission)
+colnames(freqTable_transmission) <- c("Transmission", "Frequency")
+
+freqTable_owner <- dplyr::count(car_sales, car_sales$owner)
+colnames(freqTable_owner) <- c("Owner Type", "Frequency")
+
+freqTable_carType <- dplyr::count(car_sales, car_sales$car_type)
+colnames(freqTable_carType) <- c("Car Type", "Frequency")
+
+bar_fuel <- ggplot(freqTable_fuel)+
+  geom_bar(
+    mapping = aes(
+      x = `Fuel Type`, 
+      y = Frequency
+    ),
+    stat="identity"
+  ) +
+  theme(panel.background = element_rect("#a7f4fc")) +
+  labs(
+    title = "Plot 1: Fuel Type Distribution",
+    x = "Fuel Type",
+    y = "Frequency Count"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, colour = "#7F3D17", face = "bold"),
+    axis.text.x = element_text(vjust = 1, size = 10)
+  ) +
+  scale_y_continuous(labels = comma) +
+  ylim(0, max(freqTable_fuel$Frequency) * 1.4) +
+  geom_text(aes(x = `Fuel Type`, y = Frequency, label = Frequency), vjust = 1.8, color = "WHITE", size = 4)
+
+bar_sellerType <- ggplot(freqTable_sellerType)+
+  geom_bar(
+    mapping = aes(
+      x = `Seller Type`, 
+      y = Frequency
+    ),
+    stat="identity"
+  ) +
+  theme(panel.background = element_rect("#a7f4fc")) +
+  labs(
+    title = "Plot 2: Seller Type Distribution",
+    x = "Seller Type",
+    y = "Frequency Count"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, colour = "#7F3D17", face = "bold"),
+    axis.text.x = element_text(vjust = 1, size = 10)
+  ) +
+  scale_y_continuous(labels = comma) +
+  ylim(0, max(freqTable_sellerType$Frequency) * 1.4) +
+  geom_text(aes(x = `Seller Type`, y = Frequency, label = Frequency), vjust = 1.8, color = "WHITE", size = 4)
+
+bar_transmission <- ggplot(freqTable_transmission)+
+  geom_bar(
+    mapping = aes(
+      x = Transmission, 
+      y = Frequency
+    ),
+    stat="identity"
+  ) +
+  theme(panel.background = element_rect("#a7f4fc")) +
+  labs(
+    title = "Plot 1: Transmission Type Distribution",
+    x = "Transmission Type",
+    y = "Frequency Count"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, colour = "#7F3D17", face = "bold"),
+    axis.text.x = element_text(vjust = 1, size = 10)
+  ) +
+  scale_y_continuous(labels = comma) +
+  ylim(0, max(freqTable_transmission$Frequency) * 1.4) +
+  geom_text(aes(x = Transmission, y = Frequency, label = Frequency), vjust = 1.8, color = "WHITE", size = 4)
+
+bar_owner <- ggplot(freqTable_owner)+
+  geom_bar(
+    mapping = aes(
+      x = `Owner Type`, 
+      y = Frequency
+    ),
+    stat="identity"
+  ) +
+  theme(panel.background = element_rect("#a7f4fc")) +
+  labs(
+    title = "Plot 1: Owner Type Distribution",
+    x = "Owner Type",
+    y = "Frequency Count"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, colour = "#7F3D17", face = "bold"),
+    axis.text.x = element_text(vjust = 1, size = 10, angle = 0)
+  ) +
+  scale_y_continuous(labels = comma) +
+  ylim(0, max(freqTable_owner$Frequency) * 1.4) +
+  geom_text(aes(x = `Owner Type`, y = Frequency, label = Frequency), vjust = 1.8, color = "WHITE", size = 4)
+
+bar_carType <- ggplot(freqTable_carType)+
+  geom_bar(
+    mapping = aes(
+      x = `Car Type`, 
+      y = Frequency
+    ),
+    stat="identity"
+  ) +
+  theme(panel.background = element_rect("#a7f4fc")) +
+  labs(
+    title = "Plot 1: Car Type Distribution",
+    x = "Car Type",
+    y = "Frequency Count"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, colour = "#7F3D17", face = "bold"),
+    axis.text.x = element_text(vjust = 1, size = 10)
+  ) +
+  scale_y_continuous(labels = comma) +
+  ylim(0, max(freqTable_carType$Frequency) * 1.4) +
+  geom_text(aes(x = `Car Type`, y = Frequency, label = Frequency), vjust = 1.8, color = "WHITE", size = 4)
+
+grid.arrange(bar_fuel, bar_sellerType, bar_transmission, bar_owner, bar_carType)
+
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>From the above graphs, we can figure out the following points :
+
+<ul>
+<li>There is not much difference in between the frequency of diesel and petrol cars.
+<li>Individual seller type accounts for the most percentage of the cars in the data set. 75% of the cars on CarDekho.com belong to the 'Individual' seller type.
+<li>Majority of customers prefer cars of 'Manual' transmission type over 'Automatic' and of 'Small' size.
+</ul>
+  
+  
+__Histogram and Box plot of numeric variables__
+
+In the following section, we're plotting the histograms and boxplots to understand the uni-variate distribution of the numeric variables.
+```{r hist_box_sp, message=FALSE, warning=FALSE}
+
+# Function to plot graph
+univariate_plot <- function(x){
+  grid.arrange(ggplot(data = car_sales) + geom_histogram(mapping = aes(x)),
+               ggplot(data = car_sales) + geom_boxplot(mapping = aes(x)))
+}
+
+#Selling Price
+univariate_plot(car_sales$selling_price)
+
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>Most of the data is concentrated in the range of 0 to 1300 and any value above 1325 are outliers.
+  
+```{r hist_box_kd, message=FALSE, warning=FALSE}
+#Kilometer Driven
+univariate_plot(car_sales$km_driven)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>Mahindra XUV500 W6 2WD and Hyundai i20 Asta 1.2 are outliers to the data set as they have been driven over 150,000 kms.
+
+```{r hist_box_mlg, message=FALSE, warning=FALSE}
+#Car mileage
+univariate_plot(car_sales$mileage)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>There are 2 outliers in both of the extremes. Otherwise, the data seems to be normally distributed.
+  
+```{r hist_box_eng, message=FALSE, warning=FALSE}
+#Engine BHP
+univariate_plot(car_sales$engine)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>A fair share of cars belong to the engine types of 1200 CC. Records in north of 2200 CC are outliers to the data set.
+  
+```{r hist_box_trq, message=FALSE, warning=FALSE}
+# Torque
+univariate_plot(car_sales$torque)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>The data set seems to be normally distributed for the feature 'torque' with the presence of some outliers.
+  
+```{r hist_box_rpm, message=FALSE, warning=FALSE}
+# RPM
+univariate_plot(car_sales$rpm)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>There are no outliers in the data set for the feature 'rpm' and no legible distribution can be figured out from the data.
+  
+  
+__Check for the normality of numeric variables__
+
+Q-Q Plot is used to visualise the normality of the numeric data. If the 'Sample' and 'Theoretical' quantiles fall in the same line, those features can be considered normally distributed.
+```{r normal, message=FALSE, warning=FALSE}
+# Check Normality using Shapiro-Wilks Test
+#shapiro.test(car_sales$selling_price)
+
+# Function to plot graph
+qq_plot <- function(numeric_feature, mainTitle) {
+  qqnorm(numeric_feature, pch = 5, frame = TRUE, main = mainTitle)
+  qqline(numeric_feature, col = "#52ffbf", lwd = 2)
+}
+
+# Changing Plot Matrix Size to 3x2.
+par(mfrow = c(3,3))
+
+# Check Normality using Q-Q Plot of 'Selling Price' Feature.
+qq_plot(car_sales$selling_price, "Selling Price")
+
+# Check Normality using Q-Q Plot of 'KMs Driven' Feature.
+qq_plot(car_sales$km_driven, "KMs Driven")
+
+# Check Normality using Q-Q Plot of 'Mileage' Feature.
+qq_plot(car_sales$mileage, "Mileage")
+
+# Check Normality using Q-Q Plot of 'Engine' Feature.
+qq_plot(car_sales$engine, "Engine")
+
+# Check Normality using Q-Q Plot of 'Max Power' Feature.
+qq_plot(car_sales$max_power, "Max Power")
+
+# Check Normality using Q-Q Plot of 'Torque' Feature.
+qq_plot(car_sales$torque, "Torque")
+
+# Check Normality using Q-Q Plot of 'RPM' Feature.
+qq_plot(car_sales$rpm, "RPM")
+
+# Resetting Plot Matrix Size to 1x1.
+par(mfrow = c(1,1))
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>The features 'mileage' and 'KMs driven' can be considered as normally distributed and other features will need to be treated to make them normally distributed.
+  
+  
+### Multivariate Analysis
+
+__Correlation matrix of numeric variables__
+
+Understanding the correlation between the numeric features of the data set.
+```{r corr, message=FALSE, warning=FALSE}
+#install.packages("ggcorrplot")
+library(ggcorrplot)
+
+data_corr <- car_sales[, c("selling_price", "km_driven", "mileage", "engine", 
+                      "max_power", "seats", "torque", "rpm", "age")]
+corr <- round(cor(data_corr), 2)
+
+ggcorrplot(corr, hc.order = TRUE, outline.col = "white", 
+           ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726"))
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>'Max Power' seems to be highly correlated with 'Torque' and 'Selling Price'.
+  
+  
+__Pairplot of all the numeric variables__
+
+Using pairplots, we can figure out the correlations (Positive, Negative, No Correlation) between the attributes (features) of the data set.
+```{r par_plot, message=FALSE, warning=FALSE}
+#install.packages("GGally")
+library(GGally)
+ggpairs(car_sales, columns = c(2, 3, 8:13), aes(color = transmission, alpha = 0.5))
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>There are positive correlations between 'Max Power' and 'Engine'. No correlations can be found between 'Kms Driven' and other attributes.
+  
+  
+__Yearly trend of price__
+
+Scatterplot between Kms driven and Selling price over the year. The plot has been shown in the form of GIF instead of static plot.
+```{r price_trend, message=FALSE, warning=FALSE}
+#install.packages("gganimate")
+#install.packages("gifski")
+#install.packages("av")
+library(ggplot2)
+library(gganimate)
+
+# Make a ggplot, but add frame=year: one image per year
+gif1 <- ggplot(car_sales, aes(km_driven, selling_price, color = transmission)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_bw() +
+  # gganimate specific bits:
+  labs(title = 'Year: {frame_time}', x = 'Kilometers driven', y = 'Price of car') +
+  transition_time(as.integer(year)) +
+  ease_aes('linear')
+
+# Save as GIF:
+animate(gif1, nframes = 100, fps = 5, end_pause = 20, renderer=gifski_renderer("test.gif"))
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+1. The number of cars sold from 1983 till 2000 were very less and most of them were manual cars. 
+2. After 2005, the demand of automatic cars increased which peaked in 2015 overtaking manual cars.
+  
+  
+### Relationships between Attributes
+  
+Relationships between the attributes in our data set can be studied using scatterplots amongst them. The pattern of distribution of data set and the correlation between the variables can also be decoded from regression lines in the plot using GEOM_SMOOTH() function.
+  
+__Scatter plot between 'Selling Price' and 'Mileage' distributed by transmission type__
+```{r rel_1, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables 'Mileage' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = mileage, y = selling_price, color = transmission)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Cars' Mileage vs Selling Price", x = "Mileage", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$mileage))
+```
+  
+  
+__Scatter plot between 'Engine' and 'Selling Price' distributed by transmission type__
+```{r rel_2, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables 'Engine' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = engine, y = selling_price, color = transmission)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Cars' Engine vs Selling Price", x = "Engine", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$engine))
+```
+  
+  
+__Scatter plot between 'Max Power' and 'Selling Price' distributed by transmission type__
+```{r rel_3, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables 'Max Power' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = selling_price, y = max_power, color = transmission)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Cars' Max-Power vs Selling Price", x = "Max-Power", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$max_power))
+```
+  
+  
+__Scatter plot between 'Selling Price' and 'Owner Type' distributed by transmission type__
+```{r rel_4, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables and 'Owner Type' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = owner, y = selling_price, color = transmission)) +
+  geom_point() +
+  geom_jitter() +
+  labs(title = "Scatter Plot of Cars' Owner Type vs Selling Price", x = "Owner Type", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$owner))
+```
+  
+  
+__Scatter plot between 'Fuel' and 'Selling Price' distributed by transmission type__
+```{r rel_5, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables 'Fuel' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = fuel, y = selling_price, color = transmission)) +
+  geom_point() +
+  geom_jitter() +
+  labs(title = "Scatter Plot of Cars' Fuel vs Selling Price", x = "Brands", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$fuel))
+```
+  
+  
+__Scatter plot between 'Kilometers Driven' and 'Selling Price' distributed by transmission type__
+```{r rel_6, message=FALSE, warning=FALSE}
+# Make a ggplot (Scatter plot) of variables 'Kilometers Driven' and 'Selling Price'.
+ggplot(data = car_sales, aes(x = km_driven, y = selling_price, color = transmission)) +
+  geom_point() +
+  geom_jitter() +
+  labs(title = "Scatter Plot of Cars' Kilometers Driven vs Selling Price", x = "Kilometers Driven", y = 'Selling Price') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10)) + 
+  geom_smooth(method = "lm")
+
+summary(lm(car_sales$selling_price ~ car_sales$km_driven))
+```
+
+  
+## Hypothesis Testing
+
+Hypothesis testing is used to validate an assumption regarding the population parameter, which can be generalized. Based on the sample size, distribution and the sample statistics know, different types of hypothesis tests can be employed. The general steps involved in hypothesis testing are:-
+1. Formulate the NULL and alternative hypothesis
+2. Plan the test to be performed and decide the critical value
+3. Perform the test and obtain the test statistics
+4. Reject the NULL hypothesis or state that the null hypothesis is plausible
+  
+### One Sample t-Tests
+
+__One Sample t-Test of the kilometers driven by 'Individual' Seller-type__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Mean of kilometers driven by 'Individual' seller-type is equal to the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Mean of kilometers driven by 'Individual' seller-type is greater than the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Greater  
+
+```{r ttest1, message=FALSE, warning=FALSE}
+# Average of 'Km_driven' across the data set.
+mean_km_driven <- mean(car_sales$km_driven)
+
+# One-Sample t-test for kilometers driven by 'Individual' Seller type with its mean.
+ttest <- t.test(car_sales$km_driven[car_sales$seller_type == "Individual"], mu = mean_km_driven, alternative = "greater", conf.level = .95)
+
+ttest
+format(ttest$p.value, scientific = FALSE)
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`
+
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our One-Sample t-Test is `r ttest$p.value`, which is less than our alpha = 0.05, we reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that Population True Mean of the kilometers driven by 'Individual' seller-type in the data set is greater than the True Mean of kilometers driven by all seller-types in the data set.
+  
+  
+__One Sample t-Test of the selling price of cars sold by 'Dealer' Seller-type__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Mean of selling price of cars sold by 'Dealer' seller-type is equal to the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Mean of selling price of cars sold by 'Dealer' seller-type is greater than the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Greater  
+
+```{r ttest2, message=FALSE, warning=FALSE}
+# Average of 'selling_price' across the data set.
+mean_selling_price <- mean(car_sales$selling_price)
+
+# One-Sample t-test for selling price of cars sold by 'Dealer' Seller type with its mean.
+ttest <- t.test(car_sales$selling_price[car_sales$seller_type == "Dealer"], mu = mean_selling_price, alternative = "greater", conf.level = .95)
+
+ttest
+format(ttest$p.value, scientific = FALSE)
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our One-Sample t-Test is `r ttest$p.value`, which is less than our alpha = 0.05, we reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that Population True Mean of the selling price of cars sold by 'Dealer' seller-type in the data set is greater than the True Mean of selling price of cars sold by all seller-types in the data set.
+  
+  
+The feature 'Owner' contains values like 'First Owner, Second Owner, Third Owner, Fourth Owner, Test Drive Cars'. We removed the 'Test Drive' cars from the data set to make it more consumer centric and also because there record quantity is very less when compared with others in the data set.
+```{r ownership_filter, message=FALSE, warning=FALSE}
+# Remove cars belonging to 'Test Drive' owners.
+car_sales <- filter(car_sales, !owner %in% c("Test Drive Car"))
+```
+  
+
+__One Sample t-Test of the kilometers driven by 'First Owners' of the cars__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Mean of kilometers driven by 'First Owner' owner-type is equal to the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Mean of kilometers driven by 'First Owner' owner-type is less than the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Less  
+
+```{r ttest3, message=FALSE, warning=FALSE}
+# Average of 'Km_driven' across the data set.
+mean_km_driven <- mean(car_sales$km_driven)
+
+# One-Sample t-test for kilometers driven by 'First Owners' of the cars with its mean.
+ttest <- t.test(car_sales$km_driven[car_sales$owner == "First Owner"], mu = mean_km_driven, alternative = "less", conf.level = .95)
+
+ttest
+format(ttest$p.value, scientific = FALSE)
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`  
+
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our One-Sample t-Test is `r ttest$p.value`, which is less than our alpha = 0.05, we reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that Population True Mean of the kilometers driven by 'First Owner' owner-type in the data set is less than the True Mean of kilometers driven by 'First Owner' owner-types in the data set.
+  
+  
+__One Sample t-Test of the selling price of cars sold owned by 'First Owners' of the cars__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Mean of selling price of cars sold by 'First Owner' owner-type is equal to the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Mean of selling price of cars sold by 'First Owner' owner-type is greater than the overall average.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Greater  
+```{r ttest4, message=FALSE, warning=FALSE}
+# Average of 'selling_price' across the data set.
+mean_selling_price <- mean(car_sales$selling_price)
+
+# One-Sample t-test for selling price of cars sold owned by 'First Owners' of the cars with its mean.
+ttest <- t.test(car_sales$selling_price[car_sales$owner == "First Owner"], mu = mean_selling_price, alternative = "greater", conf.level = .95)
+
+ttest
+
+print(paste("P-value :", format(ttest$p.value, scientific = FALSE)))
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`  
+
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our One-Sample t-Test is `r ttest$p.value`, which is less than our alpha = 0.05, we reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that Population True Mean of the selling price of cars sold by 'First Owner' owner-type in the data set is greater than the True Mean of selling price of cars sold by all owner-type in the data set.
+  
+  
+### Two Sample t-Tests
+
+__Two Sample t-Test to test equality of the kilometers driven by 'Small & Medium' Car-types__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>Mean kilometers driven for small cars (car_type = small) is equal to the kilometers driven for medium cars. mean(small car_type) = mean(medium car_type)  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>Mean kilometers driven for small cars (car_type = small) is not equal to the kilometers driven for medium cars. mean(small car_type) != mean(medium car_type)  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Two.Sided  
+
+```{r ttest5, message=FALSE, warning=FALSE}
+# Two-Sample t-test to test equality of the kilometers driven by 'Small & Medium' Car-types.
+ttest <- t.test(car_sales$km_driven[car_sales$car_type == "Small"], car_sales$km_driven[car_sales$car_type == "Medium"], alternative = "two.sided", conf.level = .95)
+
+ttest
+format(ttest$p.value, scientific = FALSE)
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`  
+
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our Two-Sample t-Test is `r ttest$p.value`, which is less than our alpha = 0.05, we reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that Mean kilometers driven for small cars (car_type = small) is not equal to the kilometers driven for medium cars in the data set.
+  
+  
+__Two Sample t-Test to test equality of the kilometers driven by 'Dealer & Trustmark Dealer' Seller-types__
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>Mean kilometers driven for dealers (seller_type = dealer) is equal to the kilometers driven for trustmark dealer. mean(dealer seller_type) = mean(trustmark dealer seller_type)  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>Mean kilometers driven for dealers (seller_type = dealer) is not equal to the kilometers driven for trustmark dealer. mean(dealer seller_type) != mean(trustmark dealer seller_type)  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATIVE : </B></FONT>Two.Sided  
+
+```{r ttest6, message=FALSE, warning=FALSE}
+# Two-Sample t-Test to test equality of the kilometers driven by 'Dealer & Trustmark Dealer' Seller-types.
+ttest <- t.test(car_sales$km_driven[car_sales$seller_type == "Dealer"], car_sales$km_driven[car_sales$seller_type == "Trustmark Dealer"], alternative = "two.sided", conf.level = .95)
+
+ttest
+format(ttest$p.value, scientific = FALSE)
+```
+  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r ttest$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r ttest$p.value`  
+
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our Two-Sample t-Test is `r ttest$p.value`, which is not less than our alpha = 0.05, we cannot reject the Null Hypothesis of the test. 
+This means that we do not have sufficient evidence to say that Mean kilometers driven for dealers (seller_type = dealer) is not equal to the kilometers driven for trustmark dealer in the data set.
+  
+  
+### Chi Square Test
+__Chi Square test to identify association between variables 'Owner Type & Fuel'__
+
+
+```{r chisqtest1, message=FALSE, warning=FALSE}
+# Chi Square test to verify the association between the variables Owner Type & Fuel
+#chisq_test <- 
+#format(chisq_test$p.value, scientific = FALSE)
+
+
+# 1. convert the data as a table
+car_sales_tab <- table(car_sales$owner, car_sales$fuel)
+dt <- as.table(as.matrix(car_sales_tab))
+
+# 2. Graph
+balloonplot(t(dt), main ="Balloon Plot of Contigency Table of Owner and Fuel", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+```
+  
+  
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>There is no relationship between Owner-Type and Fuel-Type of cars. The variables are independent.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>There exists some relationship between Owner-Type and Fuel-Type of cars. The variables are dependent.  
+  
+```{r chisqtest2, message=FALSE, warning=FALSE}
+# Chi Square test to verify the association between the variables Owner Type & Fuel
+chisq_test <- chisq.test(car_sales_tab)
+chisq_test
+format(chisq_test$p.value, scientific = FALSE)
+```
+
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>DEGREE OF FREEDOM : </B></FONT>`r chisq_test$parameter`  
+<FONT SIZE = 2, COLOR = " #f7b21b"><B>P-VALUE : </B></FONT>`r chisq_test$p.value`   
+  
+  
+### One Way ANOVA test
+__One Way ANOVA between categorical Owner and Fuel and other continuous variables__
+
+Categorical variables:  
+
+* fuel  
+* owner  
+
+Continuous variables:  
+
+* max_power
+* engine
+* mileage
+* km_driven
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Fuel and Max-Power groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Fuel and Max-Power groups are not same.  
+
+```{r anova1, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between fuel and max_power
+one.way1 <- aov(max_power ~ fuel, data = car_sales)
+summary(one.way1)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Fuel and Max-Power groups are not same in the data set.  
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Fuel and Engine groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Fuel and Engine groups are not same.  
+
+```{r anova2, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between fuel and engine
+one.way2 <- aov(engine ~ fuel, data = car_sales)
+summary(one.way2)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Fuel and Engine groups are not same in the data set.  
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Fuel and Mileage groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Fuel and Mileage groups are not same.  
+
+```{r anova3, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between fuel and mileage
+one.way3 <- aov(mileage ~ fuel, data = car_sales)
+summary(one.way3)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Fuel and Mileage groups are not same in the data set.  
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Fuel and Kilometers-Driven groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Fuel and Kilometers-Driven groups are not same.  
+
+```{r anova4, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between fuel and km_driven
+one.way4 <- aov(km_driven ~ fuel, data = car_sales)
+summary(one.way4)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Fuel and Kilometers-Driven groups are not same in the data set.  
+
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Owner and Max-Power groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Owner and Max-Power groups are not same.  
+
+```{r anova5, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between owner and max_power
+one.way5 <- aov(max_power ~ owner, data = car_sales)
+summary(one.way5)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Owner and Max-Power groups are not same in the data set.  
+  
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Owner and Engine groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Owner and Engine groups are not same.  
+
+```{r anova6, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between owner and engine
+one.way6 <- aov(engine ~ owner, data = car_sales)
+summary(one.way6)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is not less than our alpha = 0.05, we can not reject the Null Hypothesis of the test. 
+This means that we do not have sufficient evidence to say that True Means of the Owner and Engine groups are not same in the data set.   
+  
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Owner and Mileage groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Owner and Mileage groups are not same.  
+
+```{r anova7, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between owner and mileage
+one.way7 <- aov(mileage ~ owner, data = car_sales)
+summary(one.way7)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Owner and Mileage groups are not same in the data set.  
+  
+<FONT SIZE = 2, COLOR = " #668203"><B>NULL HYPOTHESIS, H0 : </B></FONT>True Means of the Owner and Kilometers-Driven groups are same.  
+<FONT SIZE = 2, COLOR = " #668203"><B>ALTERNATE HYPOTHESIS, H1 : </B></FONT>True Means of the Owner and Kilometers-Driven groups are not same.  
+
+```{r anova8, message=FALSE, warning=FALSE}
+# One way ANOVA test to test the association between owner and km_driven
+one.way8 <- aov(km_driven ~ owner, data = car_sales)
+summary(one.way8)
+```
+  
+<FONT SIZE = 2, COLOR = " #A11515"><B>Observation - </B></FONT>
+Since, the p-value of our ANOVA test is less than our alpha = 0.05, we can reject the Null Hypothesis of the test. 
+This means that we have sufficient evidence to say that True Means of the Owner and Kilometers-Driven groups are not same in the data set.  
+
+
+# Regression Model
+  
+Linear regression models the relationship between two variables by fitting a linear equation to observed data. One variable is considered to be an explanatory variable, and the other is considered to be a dependent variable. Linear regression uses the equation y = B0 + B1*x to model the data. We are going to model the price of the cars listed on CarDekho.com with the other variables. 
+  
+## Assumptions of Linear Model
+  
+Before building a linear regression model, these assumptions need to be verified:
+1. Linear relationship: There exists a linear relationship between the independent variable, x, and the dependent variable, y.
+2. Independence: The residuals are independent. In particular, there is no correlation between consecutive residuals in time series data.
+3. Homoscedasticity: The residuals have constant variance at every level of x.
+4. Normality: The residuals of the model are normally distributed.
+
+We have already tested the linearity and dependence of the variables. We are going to test the normality of the data now, before building the linear regression model.  
+   
+```{r hist_density, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = car_sales) + 
+  geom_histogram(mapping = aes(selling_price))
+
+p2 <- ggdensity(car_sales$selling_price,  fill = 'lightgray') + 
+  stat_overlay_normal_density(color = 'red', linetype = 'dashed') + 
+  xlab(label = 'Selling Price') +
+  labs(title = 'Density plot of Selling Price')
+
+gridExtra::grid.arrange(p1, p2)
+```
+
+The Selling price variable needs to be log transformed to convert it into normal distribution.  
+
+```{r log_density, message=FALSE, warning=FALSE}
+ggdensity(log(car_sales$selling_price),  fill = 'lightgray') + 
+  stat_overlay_normal_density(color = 'red', linetype = 'dashed') + 
+  xlab(label = 'Log Selling Price') +
+  labs(title = 'Density plot of Log transformed Selling Price')
+```
+  
+  
+Transformed the selling price  
+
+```{r transform, message=FALSE, warning=FALSE}
+car_sales$log_selling_price <- log(car_sales$selling_price)
+
+names_vec <- c('log_selling_price', 'fuel', 'seller_type', 'transmission', 'owner', 'engine', 'max_power', 'torque', 'age', 'brand')
+car_sales_df <- car_sales[, names_vec]
+
+```
+
+
+## Building Linear Regression model  
+  
+The lm() function is used to build the linear regression model. However, to obtain the best model, we have used an approach called stepwise linear regression. Stepwise linear regression is a method of regressing multiple variables while simultaneously removing those that aren't important. Stepwise regression essentially does multiple regression a number of times, each time removing the weakest correlated variable. At the end we are left with the variables that explain the distribution best.
+  
+```{r lm, message=FALSE, warning=FALSE}
+# Fit the full model 
+full.model <- lm(log_selling_price ~., data = car_sales_df)
+# Stepwise regression model
+step.model <- stepAIC(full.model, direction = "both", 
+                      trace = FALSE)
+summary(step.model)
+```
+  
+  
+# Conclusion
+
+The data set of car sales by <a href = "https://www.cardekho.com/">CarDekho.com</a> has provided various insights about the types of cars sold in the car industry and the patterns between them. The data set contains 8128 data points along with 13 features related to car details, engine details, and sale details.
+
+<ol>
+<li>Data cleaning and data pre-processing are important to prepare the data in the correct format before building the regression model. We extracted numerical values from text fields like engine, mileage, torque, along with brand information from car name.
+<li>Unnecessary data that skew the results were also filtered out.
+<li>To ensure that the numerical variables are not skewed, it's crucial to remove or impute the missing values and outliers. We imputed the missing values using kNN imputation method.
+<li>Feature engineering and exploratory data analysis were performed to gather more meaningful information from the data. 
+<li>Derived variables were created using the existing features and skewed variables were scaled. 
+<li>Apart from this, various data visualization, like box plot, frequency plot, histogram, pair plot, correlation matrix and scatter plot were created to understand the uni-variate distribution and multi-variate relationship of the data.
+<li>Once the data cleaning and exploratory analysis is performed, hypothesis testing is performed to validate certain assumptions on the sample data.
+</ol>
+
+We used one sample t-Test and two sample t-Test to compare the variables 'km_driven' and 'selling_price' with the overall sample average and compare across two groups respectively. Based on the exploratory analysis performed earlier, we wanted to validate the following hypotheis using t-test:  
+
+1. True Mean of kilometers driven by ‘Individual’ seller-type is greater than the overall average
+2. True Mean of selling price of cars sold by ‘Dealer’ seller-type is greater than the overall average
+3. True Mean of kilometers driven by ‘First Owner’ owner-type is less than the overall average
+4. True Mean of selling price of cars sold by ‘First Owner’ owner-type is greater than the overall average
+5. Mean kilometers driven for small cars is not equal to the kilometers driven for medium cars
+6. Mean kilometers driven for dealers is not equal to the kilometers driven for trustmark dealer  
+
+In the first five test, based on the t-statistic and p-value we obtained sufficient evidences to reject the NULL hypothesis, however in the last test, we did not obtain enough evidence to reject the NULL hypothesis.
+
+We also performed Chi-Square Test and One-wav ANOVA test on categorical and continuous variables in our data set. The p-value of all the tests except the one where groups of Owner and Engine were taken came out to be very less than our assumed alpha = 0.05. Therefore, we were able to reject the Null Hypotheses in all but one tests successfully.
+
+Lastly, we performed Regression Analysis on our data set to model the prices of cars listed on CarDekho.com. We log transformed the Selling price variable to convert it into normal distribution and used lm() function to build the linear regression model. 
+
+# Bibliography
+
+Vehicle dataset. (2020, October 24). Kaggle. https://www.kaggle.com/nehalbirla/vehicle-dataset-from-cardekho
+
+Xie, Y. C. D. (2021, October 7). R Markdown Cookbook. R Markdown. Retrieved October 30, 2021, from https://bookdown.org/yihui/rmarkdown-cookbook/
+
+Bluman, A. (2017). Elementary Statistics: A Step By Step Approach (10th ed.). McGraw-Hill Education.
+
+Kabacoff, R., I. (2022). R in Action, Third Edition. Manning.
+
+CarDekho. (2021). About Us | CarDekho.com. https://www.cardekho.com/info/about_us
+
+F. (2021, April 2). tidyverse in r – Complete Tutorial. R-Bloggers. Retrieved October 30, 2021, from https://www.r-bloggers.com/2021/04/tidyverse-in-r-complete-tutorial/
+
+D. (2021a, March 22). Data Analytics for Car Dealers. Automated Metrics. https://www.automatedmetrics.io/data-analytics-for-car-dealers/
+
+# Appendix
+
+The RMD file of the analysis is included with the analysis report.
